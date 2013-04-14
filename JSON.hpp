@@ -7,6 +7,7 @@ namespace JSON
 {
     template <typename Tag> struct Literal { };
 
+    typedef Literal<struct tag_undefined> Undefined;
     typedef Literal<struct tag_false> False;
     typedef Literal<struct tag_null>  Null;
     typedef Literal<struct tag_true>  True;
@@ -36,6 +37,7 @@ namespace JSON
     struct Number { double value;      };
 
     typedef boost::variant<
+            Undefined, // not legal as a JSON result
             False, 
             Null, 
             True, 

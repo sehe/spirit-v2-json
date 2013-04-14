@@ -4,6 +4,9 @@
         "Height": 600,
         "Title":  "View from 15th Floor",
         "Thumbnail": {
+            "Dummy": null,
+            "Yummy": false,
+            "Tummy": true,
             "Url":    "htt\u0007p://www.example.com/image/481989943\\\"something\"",
             "Height": 125,
             "Width":  "100"

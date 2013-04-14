@@ -59,10 +59,11 @@ namespace JSON {
         return os << '"'; 
     }
 
-    std::ostream& operator<<(std::ostream& os, Number const& v) { return os << '"' << v.value << '"'; }
-    std::ostream& operator<<(std::ostream& os, Literal<tag_false>  const& v) { return os << "false"; }
-    std::ostream& operator<<(std::ostream& os, Null   const& v) { return os << "null";  }
-    std::ostream& operator<<(std::ostream& os, True   const& v) { return os << "true";  }
+    std::ostream& operator<<(std::ostream& os, Number    const& v) { return os << '"' << v.value << '"'; }
+    std::ostream& operator<<(std::ostream& os, Undefined const& v) { return os << "undefined"; }
+    std::ostream& operator<<(std::ostream& os, False     const& v) { return os << "false";     }
+    std::ostream& operator<<(std::ostream& os, Null      const& v) { return os << "null";      }
+    std::ostream& operator<<(std::ostream& os, True      const& v) { return os << "true";      }
     std::ostream& operator<<(std::ostream& os, Value  const& v) { 
         using boost::phoenix::arg_names::arg1;
         boost::apply_visitor(make_visitor(os << arg1), v);
@@ -96,8 +97,14 @@ template <typename It, typename Skipper = qi::space_type>
     parser() : parser::base_type(json)
     {
         // 2.1 values
-        value = 
-            qi::lit("false") | "null" | "true" | object | array | number | string;
+        value = qi::attr_cast<False> (qi::lit("false")) 
+              | qi::attr_cast<Null>  (qi::lit("null")) 
+              | qi::attr_cast<True>  (qi::lit("true"))
+              | object 
+              | array 
+              | number 
+              | string
+              ;
 
         // 2.2 objects
         object = '{' >> -(member % ',') >> '}';
