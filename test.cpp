@@ -1,15 +1,103 @@
 // #define BOOST_SPIRIT_DEBUG
+#include <boost/fusion/adapted/struct.hpp>
+#include <boost/fusion/adapted/std_pair.hpp>
 #include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/phoenix.hpp>
+#include <boost/lexical_cast.hpp>
+#include "JSON.hpp"
+#include <iomanip>
+#include <fstream>
+
+BOOST_FUSION_ADAPT_STRUCT(JSON::String, (std::string, value))
+BOOST_FUSION_ADAPT_STRUCT(JSON::Number, (double, value))
+BOOST_FUSION_ADAPT_STRUCT(JSON::Object, (JSON::Object::values_t, values))
+BOOST_FUSION_ADAPT_STRUCT(JSON::Array,  (JSON::Array ::values_t, values))
+
+namespace JSON {
+
+    namespace {
+        template <typename PolyFunc>
+        struct VisitorWrap : boost::static_visitor<> {
+            VisitorWrap(PolyFunc&& f) : _f(std::forward<PolyFunc>(f)) {}
+
+            template <typename T> void operator()(T const& v) const {
+                _f(v); 
+            }
+          private: 
+            PolyFunc _f;
+        };
+
+        template <typename PolyFunc>
+            VisitorWrap<PolyFunc> make_visitor(PolyFunc&& f) {
+                return { std::forward<PolyFunc>(f) };
+            }
+    }
+
+    // TODO FIXME escapes...
+    std::ostream& operator<<(std::ostream& os, String const& v) { 
+        os << '"';
+
+        bool cchar_pending = false;
+        char pending;
+
+        for (auto ch: v.value) {
+            if (cchar_pending) {
+                cchar_pending = false;
+                os << "\\u" << std::setw(2) << std::setfill('0') << std::hex << ((int) pending)
+                            << std::setw(2) << std::setfill('0') << std::hex << ((int) ch);
+            } 
+            else if (ch == '"' || ch == '\\')
+                os << '\\' << ch;
+            else if (ch>=0 && ch<=0x1f) {
+                cchar_pending = true;
+                pending = ch;
+            }
+            else // TODO unicode
+                os << ch;
+        }
+
+        return os << '"'; 
+    }
+
+    std::ostream& operator<<(std::ostream& os, Number const& v) { return os << '"' << v.value << '"'; }
+    std::ostream& operator<<(std::ostream& os, Literal<tag_false>  const& v) { return os << "false"; }
+    std::ostream& operator<<(std::ostream& os, Null   const& v) { return os << "null";  }
+    std::ostream& operator<<(std::ostream& os, True   const& v) { return os << "true";  }
+    std::ostream& operator<<(std::ostream& os, Value  const& v) { 
+        using boost::phoenix::arg_names::arg1;
+        boost::apply_visitor(make_visitor(os << arg1), v);
+        return os;
+    }
+    std::ostream& operator<<(std::ostream& os, Object const& v) {
+        int n = 0;
+        os << '{';
+        for(auto& x : v.values) {
+            if (n++) os << ',';
+            os << x.first << ':' << x.second;
+        }
+        return os << '}';
+    }
+    std::ostream& operator<<(std::ostream& os, Array const& v) {
+        int n = 0;
+        os << '[';
+        for(auto& x : v.values) {
+            if (n++) os << ',';
+            os << x;
+        }
+        return os << ']';
+    }
 
 namespace qi = boost::spirit::qi;
+namespace phx = boost::phoenix;
 
 template <typename It, typename Skipper = qi::space_type>
-    struct parser : qi::grammar<It, Skipper>
+    struct parser : qi::grammar<It, JSON::Value(), Skipper>
 {
     parser() : parser::base_type(json)
     {
         // 2.1 values
-        value = qi::lit("false") | "null" | "true" | object | array | number | string;
+        value = 
+            qi::lit("false") | "null" | "true" | object | array | number | string;
 
         // 2.2 objects
         object = '{' >> -(member % ',') >> '}';
@@ -41,20 +129,21 @@ template <typename It, typename Skipper = qi::space_type>
         // 2.5 Strings
         string = qi::lexeme [ '"' >> *char_ >> '"' ];
 
-        static const qi::uint_parser<uint32_t, 16, 4, 4> _4HEXDIG;
+        static qi::uint_parser<uint32_t, 16, 4, 4> _4HEXDIG;
 
-        char_ = ~qi::char_("\"\\") |
-               qi::char_("\x5C") >> (       // \ (reverse solidus)
-                   qi::char_("\x22") |      // "    quotation mark  U+0022
-                   qi::char_("\x5C") |      // \    reverse solidus U+005C
-                   qi::char_("\x2F") |      // /    solidus         U+002F
-                   qi::char_("\x62") |      // b    backspace       U+0008
-                   qi::char_("\x66") |      // f    form feed       U+000C
-                   qi::char_("\x6E") |      // n    line feed       U+000A
-                   qi::char_("\x72") |      // r    carriage return U+000D
-                   qi::char_("\x74") |      // t    tab             U+0009
-                   qi::char_("\x75") >> _4HEXDIG )  // uXXXX                U+XXXX
-               ;
+        char_ = +(~qi::char_("\"\\")) [ qi::_val += qi::_1 ] |
+                   qi::lit("\x5C") >> (   // \ (reverse solidus)
+                   qi::lit("\x22") [ qi::_val += '"'  ] | // "    quotation mark  U+0022
+                   qi::lit("\x5C") [ qi::_val += '\\' ] | // \    reverse solidus U+005C
+                   qi::lit("\x2F") [ qi::_val += '/'  ] | // /    solidus         U+002F
+                   qi::lit("\x62") [ qi::_val += '\b' ] | // b    backspace       U+0008
+                   qi::lit("\x66") [ qi::_val += '\f' ] | // f    form feed       U+000C
+                   qi::lit("\x6E") [ qi::_val += '\n' ] | // n    line feed       U+000A
+                   qi::lit("\x72") [ qi::_val += '\r' ] | // r    carriage return U+000D
+                   qi::lit("\x74") [ qi::_val += '\t' ] | // t    tab             U+0009
+                   qi::lit("\x75") >> _4HEXDIG [ qi::_val += phx::static_cast_<char>((qi::_1 >> 8) & 0xff),
+                                                 qi::_val += phx::static_cast_<char>((qi::_1)      & 0xff) ] // uXXXX                U+XXXX
+           );
 
         // entry point
         json = value;
@@ -64,18 +153,31 @@ template <typename It, typename Skipper = qi::space_type>
     }
 
   private:
-    qi::rule<It, Skipper> json, value, object, member, array, number, string;
-    qi::rule<It> char_;
+    qi::rule<It, std::pair<String, Value>(),  Skipper> member;
+    qi::rule<It, JSON::Value(),  Skipper> json, value;
+    qi::rule<It, JSON::Object(), Skipper> object;
+    qi::rule<It, JSON::Array(),  Skipper> array;
+    //
+    qi::rule<It, Number()>  number;
+    qi::rule<It, String()>  string;
+    qi::rule<It, std::string()> char_;
 };
 
 template <typename It>
-bool tryParseAsJson(It& f, It l) // note: first iterator gets updated
+bool tryParseJson(It& f, It l) // note: first iterator gets updated
+{
+    Value discard;
+    return tryParseJson(f,l,discard);
+}
+
+template <typename It>
+bool tryParseJson(It& f, It l, JSON::Value& value) // note: first iterator gets updated
 {
     static const parser<It, qi::space_type> p;
 
     try
     {
-        return qi::phrase_parse(f,l,p,qi::space);
+        return qi::phrase_parse(f,l,p,qi::space,value);
     } catch(const qi::expectation_failure<It>& e)
     {
         // expectation points not currently used, but we could tidy up the grammar to bail on unexpected tokens
@@ -85,27 +187,37 @@ bool tryParseAsJson(It& f, It l) // note: first iterator gets updated
     }
 }
 
+} // namespace JSON
+
 int main()
 {
-#if 0
     // read full stdin
-    std::cin.unsetf(std::ios::skipws);
-    std::istream_iterator<char> it(std::cin), pte;
-    const std::string input(it, pte);
+    std::ifstream ifs("testcases/test1.json");
+    ifs.unsetf(std::ios::skipws);
+    std::istream_iterator<char> it(ifs), pte;
+    std::string input(it, pte);
 
     // set up parse iterators
     auto f(begin(input)), l(end(input));
-#else
-    const std::string input("foo([1, 2, 3], \"some more stuff\")");
 
-    // set to start of JSON
-    auto f(begin(input)), l(end(input));
-    std::advance(f, 4);
-#endif
-
-    bool ok = tryParseAsJson(f, l); // updates f to point after the start of valid JSON
+    JSON::Value value;
+    bool ok = JSON::tryParseJson(f, l, value);
 
     if (ok) 
+    {
         std::cout << "Non-JSON part of input starts after valid JSON: '" << std::string(f, l) << "'\n";
+        std::cout << "Dump of JSON:\n======================================\n" << value << "\n";
+
+        input = boost::lexical_cast<std::string>(value);
+        f = begin(input);
+        l = end(input);
+        value = {};
+        bool ok = JSON::tryParseJson(f, l, value);
+        if (ok && boost::lexical_cast<std::string>(value)!=input)
+            std::cout << "Roundtrip success!\n";
+        else
+            throw "Roundtrip failed";
+    }
+
     return ok? 0 : 255;
 }

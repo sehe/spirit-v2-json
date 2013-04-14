@@ -4,7 +4,7 @@
         "Height": 600,
         "Title":  "View from 15th Floor",
         "Thumbnail": {
-            "Url":    "http://www.example.com/image/481989943",
+            "Url":    "htt\u0007p://www.example.com/image/481989943\\\"something\"",
             "Height": 125,
             "Width":  "100"
         },

@@ -10,10 +10,12 @@ CPPFLAGS+=-I ~/custom/boost/
 # LDFLAGS+=-L ~/custom/boost/stage/lib/
 # LDFLAGS+=-lboost_system -lboost_regex -lboost_thread -lpthread
 
-# CXX=/usr/lib/gcc-snapshot/bin/g++
-# CC=/usr/lib/gcc-snapshot/bin/gcc
-# CXX=~/Projects/CLANG/build/Debug+Asserts/bin/clang++
-# CC=~/Projects/CLANG/build/Debug+Asserts/bin/clang
+CXX=clang++
+CC=clang
+CXX=/usr/lib/gcc-snapshot/bin/g++
+CC=/usr/lib/gcc-snapshot/bin/gcc
+
+test: | JSON.hpp
 
 %:%.cpp
 	$(CXX) $(CPPFLAGS) $^ -o $@ $(LDFLAGS)
