@@ -59,7 +59,7 @@ namespace JSON {
         return os << '"'; 
     }
 
-    std::ostream& operator<<(std::ostream& os, Number    const& v) { return os << '"' << v.value << '"'; }
+    std::ostream& operator<<(std::ostream& os, Number    const& v) { return os << v.value; }
     std::ostream& operator<<(std::ostream& os, Undefined const& v) { return os << "undefined"; }
     std::ostream& operator<<(std::ostream& os, False     const& v) { return os << "false";     }
     std::ostream& operator<<(std::ostream& os, Null      const& v) { return os << "null";      }
@@ -71,21 +71,21 @@ namespace JSON {
     }
     std::ostream& operator<<(std::ostream& os, Object const& v) {
         int n = 0;
-        os << '{';
+        os << "\n{\n";
         for(auto& x : v.values) {
-            if (n++) os << ',';
+            if (n++) os << ",\n";
             os << x.first << ':' << x.second;
         }
-        return os << '}';
+        return os << "\n}\n";
     }
     std::ostream& operator<<(std::ostream& os, Array const& v) {
         int n = 0;
-        os << '[';
+        os << "[\n";
         for(auto& x : v.values) {
-            if (n++) os << ',';
+            if (n++) os << ",\n";
             os << x;
         }
-        return os << ']';
+        return os << "\n]\n";
     }
 
 namespace qi = boost::spirit::qi;
@@ -196,6 +196,21 @@ bool tryParseJson(It& f, It l, JSON::Value& value) // note: first iterator gets 
 
 } // namespace JSON
 
+std::string to_string(JSON::Value const& json) {
+    return boost::lexical_cast<std::string>(json);
+}
+
+JSON::Value roundtrip(JSON::Value const& given) {
+    const auto input = to_string(given);
+    auto f = begin(input);
+    auto l = end(input);
+    JSON::Value back;
+    if (!JSON::tryParseJson(f, l, back))
+        throw "whoops";
+
+    return back;
+}
+
 int main()
 {
     // read full stdin
@@ -215,16 +230,22 @@ int main()
         std::cout << "Non-JSON part of input starts after valid JSON: '" << std::string(f, l) << "'\n";
         std::cout << "Dump of JSON:\n======================================\n" << value << "\n";
 
-        input = boost::lexical_cast<std::string>(value);
-        f = begin(input);
-        l = end(input);
-        value = {};
-        bool ok = JSON::tryParseJson(f, l, value);
-        if (ok && boost::lexical_cast<std::string>(value)!=input)
+        const auto verify = roundtrip(value);
+        if (ok && (to_string(value) == to_string(verify)))
             std::cout << "Roundtrip success!\n";
         else
-            throw "Roundtrip failed";
-    }
+        {
+            std::cout << "Roundtrip FAILED:\n";
+            std::cout << "Dump of JSON:\n======================================\n" << verify << "\n";
+        }
 
-    return ok? 0 : 255;
+        const auto verify2 = roundtrip(verify);
+        if (ok && (to_string(value) == to_string(verify2)))
+            std::cout << "Roundtrip #2 success!\n";
+        else
+        {
+            std::cout << "Roundtrip FAILED:\n";
+            std::cout << "Dump of JSON:\n======================================\n" << verify2 << "\n";
+        }
+    }
 }
