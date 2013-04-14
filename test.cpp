@@ -1,4 +1,5 @@
-// #define BOOST_SPIRIT_DEBUG
+//#define BOOST_SPIRIT_DEBUG
+//#define PRETTY_PRINT // well, sort of; multiline for starters
 #include <boost/fusion/adapted/struct.hpp>
 #include <boost/fusion/adapted/std_pair.hpp>
 #include <boost/spirit/include/qi.hpp>
@@ -16,21 +17,24 @@ BOOST_FUSION_ADAPT_STRUCT(JSON::Array,  (JSON::Array ::values_t, values))
 namespace JSON {
 
     namespace {
-        template <typename PolyFunc>
-        struct VisitorWrap : boost::static_visitor<> {
+        template <typename Ret, typename PolyFunc>
+        struct VisitorWrap : boost::static_visitor<Ret> {
             VisitorWrap(PolyFunc&& f) : _f(std::forward<PolyFunc>(f)) {}
 
-            template <typename T> void operator()(T const& v) const {
-                _f(v); 
+            template <typename T> Ret operator()(T const& v) const {
+                return _f(v);
             }
-          private: 
+            template <typename T, typename U> Ret operator()(T const& v, U const& w) const {
+                return _f(v, w);
+            }
+        private:
             PolyFunc _f;
         };
 
-        template <typename PolyFunc>
-            VisitorWrap<PolyFunc> make_visitor(PolyFunc&& f) {
-                return { std::forward<PolyFunc>(f) };
-            }
+        template <typename Ret = void, typename PolyFunc>
+        VisitorWrap<Ret, PolyFunc> make_visitor(PolyFunc&& f) {
+            return { std::forward<PolyFunc>(f) };
+        }
     }
 
     // TODO FIXME escapes...
@@ -66,26 +70,40 @@ namespace JSON {
     std::ostream& operator<<(std::ostream& os, True      const& v) { return os << "true";      }
     std::ostream& operator<<(std::ostream& os, Value  const& v) { 
         using boost::phoenix::arg_names::arg1;
-        boost::apply_visitor(make_visitor(os << arg1), v);
-        return os;
+        return boost::apply_visitor(make_visitor<std::ostream&>(os << arg1), v);
     }
+
+#ifdef PRETTY_PRINT
+    static const char brace_open   [] = "\n{\n";
+    static const char brace_close  [] = "\n}\n";
+    static const char bracket_open [] = "\n[\n";
+    static const char bracket_close[] = "\n]\n";
+    static const char value_sep    [] = ",\n";
+#else                                 
+    static const char brace_open   [] = "{";
+    static const char brace_close  [] = "}";
+    static const char bracket_open [] = "[";
+    static const char bracket_close[] = "]";
+    static const char value_sep    [] = ",";
+#endif
+
     std::ostream& operator<<(std::ostream& os, Object const& v) {
         int n = 0;
-        os << "\n{\n";
+        os << brace_open;
         for(auto& x : v.values) {
-            if (n++) os << ",\n";
+            if (n++) os << value_sep;
             os << x.first << ':' << x.second;
         }
-        return os << "\n}\n";
+        return os << brace_close;
     }
     std::ostream& operator<<(std::ostream& os, Array const& v) {
         int n = 0;
-        os << "[\n";
+        os << bracket_open;
         for(auto& x : v.values) {
-            if (n++) os << ",\n";
+            if (n++) os << value_sep;
             os << x;
         }
-        return os << "\n]\n";
+        return os << bracket_close;
     }
 
 namespace qi = boost::spirit::qi;
@@ -196,19 +214,24 @@ bool tryParseJson(It& f, It l, JSON::Value& value) // note: first iterator gets 
 
 } // namespace JSON
 
-std::string to_string(JSON::Value const& json) {
-    return boost::lexical_cast<std::string>(json);
-}
+namespace { // TEST utils
+    std::string to_string(JSON::Value const& json) {
+        return boost::lexical_cast<std::string>(json);
+    }
 
-JSON::Value roundtrip(JSON::Value const& given) {
-    const auto input = to_string(given);
-    auto f = begin(input);
-    auto l = end(input);
-    JSON::Value back;
-    if (!JSON::tryParseJson(f, l, back))
-        throw "whoops";
+    JSON::Value parse(std::string const& input) {
+        auto f(begin(input)), l(end(input));
 
-    return back;
+        JSON::Value parsed;
+        if (!JSON::tryParseJson(f, l, parsed))
+            throw "whoops";
+
+        return parsed;
+    }
+
+    JSON::Value roundtrip(JSON::Value const& given) {
+        return parse(to_string(given));
+    }
 }
 
 int main()
@@ -217,35 +240,27 @@ int main()
     std::ifstream ifs("testcases/test1.json");
     ifs.unsetf(std::ios::skipws);
     std::istream_iterator<char> it(ifs), pte;
-    std::string input(it, pte);
+    const std::string input(it, pte);
 
-    // set up parse iterators
-    auto f(begin(input)), l(end(input));
+    auto value = parse(input);
 
-    JSON::Value value;
-    bool ok = JSON::tryParseJson(f, l, value);
+    std::cout << "Dump of value:\n======================================\n" << value << "\n";
 
-    if (ok) 
+    const auto verify = roundtrip(value);
+    if (to_string(value) == to_string(verify))
+        std::cout << "Roundtrip success!\n";
+    else
     {
-        std::cout << "Non-JSON part of input starts after valid JSON: '" << std::string(f, l) << "'\n";
-        std::cout << "Dump of JSON:\n======================================\n" << value << "\n";
+        std::cout << "Roundtrip FAILED:\n";
+        std::cout << "Dump of verify:\n======================================\n" << verify << "\n";
+    }
 
-        const auto verify = roundtrip(value);
-        if (ok && (to_string(value) == to_string(verify)))
-            std::cout << "Roundtrip success!\n";
-        else
-        {
-            std::cout << "Roundtrip FAILED:\n";
-            std::cout << "Dump of JSON:\n======================================\n" << verify << "\n";
-        }
-
-        const auto verify2 = roundtrip(verify);
-        if (ok && (to_string(value) == to_string(verify2)))
-            std::cout << "Roundtrip #2 success!\n";
-        else
-        {
-            std::cout << "Roundtrip FAILED:\n";
-            std::cout << "Dump of JSON:\n======================================\n" << verify2 << "\n";
-        }
+    const auto verify2 = roundtrip(verify);
+    if (to_string(value) == to_string(verify2))
+        std::cout << "Roundtrip #2 success!\n";
+    else
+    {
+        std::cout << "Roundtrip FAILED:\n";
+        std::cout << "Dump of verify2:\n======================================\n" << verify2 << "\n";
     }
 }
