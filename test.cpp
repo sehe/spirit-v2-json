@@ -1,5 +1,5 @@
-//#define BOOST_SPIRIT_DEBUG
-//#define PRETTY_PRINT // well, sort of; multiline for starters
+#define BOOST_SPIRIT_UNICODE
+#define PRETTY_PRINT // well, sort of; multiline for starters
 #include <boost/fusion/adapted/struct.hpp>
 #include <boost/fusion/adapted/std_pair.hpp>
 #include <boost/spirit/include/qi.hpp>
@@ -8,8 +8,10 @@
 #include "JSON.hpp"
 #include <iomanip>
 #include <fstream>
+// unicode, please
+#include <boost/regex/pending/unicode_iterator.hpp>
 
-BOOST_FUSION_ADAPT_STRUCT(JSON::String, (std::string, value))
+BOOST_FUSION_ADAPT_STRUCT(JSON::String, (std::wstring, value))
 BOOST_FUSION_ADAPT_STRUCT(JSON::Number, (double, value))
 BOOST_FUSION_ADAPT_STRUCT(JSON::Object, (JSON::Object::values_t, values))
 BOOST_FUSION_ADAPT_STRUCT(JSON::Array,  (JSON::Array ::values_t, values))
@@ -37,66 +39,58 @@ namespace JSON {
         }
     }
 
-    // TODO FIXME escapes...
-    std::ostream& operator<<(std::ostream& os, String const& v) { 
-        os << '"';
-
-        bool cchar_pending = false;
-        char pending;
+    std::wostream& operator<<(std::wostream& os, String const& v) {
+        os << L'"';
 
         for (auto ch: v.value) {
-            if (cchar_pending) {
-                cchar_pending = false;
-                os << "\\u" << std::setw(2) << std::setfill('0') << std::hex << ((int) pending)
-                            << std::setw(2) << std::setfill('0') << std::hex << ((int) ch);
-            } 
-            else if (ch == '"' || ch == '\\')
-                os << '\\' << ch;
-            else if (ch>=0 && ch<=0x1f) {
-                cchar_pending = true;
-                pending = ch;
-            }
-            else // TODO unicode
+            if      (ch == L'"' || ch == L'\\') os << L'\\' << ch;
+            else if (ch == L'\b'              ) os << L"\\b";
+            else if (ch == L'\n'              ) os << L"\\n";
+            else if (ch == L'\r'              ) os << L"\\r";
+            else if (ch == L'\f'              ) os << L"\\f";
+            else if (ch>=0 && ch<=0x1f        ) 
+                os << L"\\u" << std::setw(4) << std::setfill(L'0') << std::hex << ((int) ch);
+            else
                 os << ch;
         }
 
-        return os << '"'; 
+        return os << L'"';
     }
 
-    std::ostream& operator<<(std::ostream& os, Number    const& v) { return os << v.value; }
-    std::ostream& operator<<(std::ostream& os, Undefined const& v) { return os << "undefined"; }
-    std::ostream& operator<<(std::ostream& os, False     const& v) { return os << "false";     }
-    std::ostream& operator<<(std::ostream& os, Null      const& v) { return os << "null";      }
-    std::ostream& operator<<(std::ostream& os, True      const& v) { return os << "true";      }
-    std::ostream& operator<<(std::ostream& os, Value  const& v) { 
+    std::wostream& operator<<(std::wostream& os, Number    const& v) { return os << v.value; }
+    std::wostream& operator<<(std::wostream& os, Undefined const& v) { return os << L"undefined"; }
+    std::wostream& operator<<(std::wostream& os, False     const& v) { return os << L"false";     }
+    std::wostream& operator<<(std::wostream& os, Null      const& v) { return os << L"null";      }
+    std::wostream& operator<<(std::wostream& os, True      const& v) { return os << L"true";      }
+    std::wostream& operator<<(std::wostream& os, Value  const& v) {
         using boost::phoenix::arg_names::arg1;
-        return boost::apply_visitor(make_visitor<std::ostream&>(os << arg1), v);
+        return boost::apply_visitor(make_visitor<std::wostream&>(os << arg1), v);
     }
 
 #ifdef PRETTY_PRINT
-    static const char brace_open   [] = "\n{\n";
-    static const char brace_close  [] = "\n}\n";
-    static const char bracket_open [] = "\n[\n";
-    static const char bracket_close[] = "\n]\n";
-    static const char value_sep    [] = ",\n";
-#else                                 
-    static const char brace_open   [] = "{";
-    static const char brace_close  [] = "}";
-    static const char bracket_open [] = "[";
-    static const char bracket_close[] = "]";
-    static const char value_sep    [] = ",";
+    static const wchar_t brace_open   [] = L"\n{\n";
+    static const wchar_t brace_close  [] = L"\n}\n";
+    static const wchar_t bracket_open [] = L"\n[\n";
+    static const wchar_t bracket_close[] = L"\n]\n";
+    static const wchar_t value_sep    [] = L",\n";
+#else
+    static const wchar_t brace_open   [] = L"{";
+    static const wchar_t brace_close  [] = L"}";
+    static const wchar_t bracket_open [] = L"[";
+    static const wchar_t bracket_close[] = L"]";
+    static const wchar_t value_sep    [] = L",";
 #endif
 
-    std::ostream& operator<<(std::ostream& os, Object const& v) {
+    std::wostream& operator<<(std::wostream& os, Object const& v) {
         int n = 0;
         os << brace_open;
         for(auto& x : v.values) {
             if (n++) os << value_sep;
-            os << x.first << ':' << x.second;
+            os << x.first << L':' << x.second;
         }
         return os << brace_close;
     }
-    std::ostream& operator<<(std::ostream& os, Array const& v) {
+    std::wostream& operator<<(std::wostream& os, Array const& v) {
         int n = 0;
         os << bracket_open;
         for(auto& x : v.values) {
@@ -106,30 +100,32 @@ namespace JSON {
         return os << bracket_close;
     }
 
-namespace qi = boost::spirit::qi;
-namespace phx = boost::phoenix;
+namespace qi         = boost::spirit::qi;
+namespace phx        = boost::phoenix;
+namespace encoding   = qi::standard_wide;
+//namespace encoding = qi::unicode;
 
-template <typename It, typename Skipper = qi::space_type>
+template <typename It, typename Skipper = encoding::space_type>
     struct parser : qi::grammar<It, JSON::Value(), Skipper>
 {
     parser() : parser::base_type(json)
     {
         // 2.1 values
-        value = qi::attr_cast<False> (qi::lit("false")) 
-              | qi::attr_cast<Null>  (qi::lit("null")) 
-              | qi::attr_cast<True>  (qi::lit("true"))
-              | object 
-              | array 
-              | number 
+        value = qi::attr_cast<False> (qi::lit(L"false")) 
+              | qi::attr_cast<Null>  (qi::lit(L"null")) 
+              | qi::attr_cast<True>  (qi::lit(L"true"))
+              | object
+              | array
+              | number
               | string
               ;
 
         // 2.2 objects
-        object = '{' >> -(member % ',') >> '}';
-        member = string >> ':' >> value;
+        object = L'{' >> -(member % L',') >> L'}';
+        member = string >> L':' >> value;
 
         // 2.3 Arrays
-        array = '[' >> -(value % ',') >> ']';
+        array = L'[' >> -(value % L',') >> L']';
 
         // 2.4.  Numbers
         // Note out spirit grammar takes a shortcut, as the RFC specification is more restrictive:
@@ -152,23 +148,24 @@ template <typename It, typename Skipper = qi::space_type>
         number = qi::double_; // shortcut :)
 
         // 2.5 Strings
-        string = qi::lexeme [ '"' >> *char_ >> '"' ];
+        string = qi::lexeme [ L'"' >> *char_ >> L'"' ];
 
-        static qi::uint_parser<uint32_t, 16, 4, 4> _4HEXDIG;
+        static qi::uint_parser<wchar_t, 16, 4, 4> _4HEXDIG;
 
-        char_ = +(~qi::char_("\"\\")) [ qi::_val += qi::_1 ] |
-                   qi::lit("\x5C") >> (   // \ (reverse solidus)
-                   qi::lit("\x22") [ qi::_val += '"'  ] | // "    quotation mark  U+0022
-                   qi::lit("\x5C") [ qi::_val += '\\' ] | // \    reverse solidus U+005C
-                   qi::lit("\x2F") [ qi::_val += '/'  ] | // /    solidus         U+002F
-                   qi::lit("\x62") [ qi::_val += '\b' ] | // b    backspace       U+0008
-                   qi::lit("\x66") [ qi::_val += '\f' ] | // f    form feed       U+000C
-                   qi::lit("\x6E") [ qi::_val += '\n' ] | // n    line feed       U+000A
-                   qi::lit("\x72") [ qi::_val += '\r' ] | // r    carriage return U+000D
-                   qi::lit("\x74") [ qi::_val += '\t' ] | // t    tab             U+0009
-                   qi::lit("\x75") >> _4HEXDIG [ qi::_val += phx::static_cast_<char>((qi::_1 >> 8) & 0xff),
-                                                 qi::_val += phx::static_cast_<char>((qi::_1)      & 0xff) ] // uXXXX                U+XXXX
-           );
+        char_ = +(
+                ~encoding::char_(L"\"\\")) [ qi::_val += qi::_1 ] |
+                   qi::lit(L"\x5C") >> (                    // \ (reverse solidus)
+                   qi::lit(L"\x22") [ qi::_val += L'"'  ] | // "    quotation mark  U+0022
+                   qi::lit(L"\x5C") [ qi::_val += L'\\' ] | // \    reverse solidus U+005C
+                   qi::lit(L"\x2F") [ qi::_val += L'/'  ] | // /    solidus         U+002F
+                   qi::lit(L"\x62") [ qi::_val += L'\b' ] | // b    backspace       U+0008
+                   qi::lit(L"\x66") [ qi::_val += L'\f' ] | // f    form feed       U+000C
+                   qi::lit(L"\x6E") [ qi::_val += L'\n' ] | // n    line feed       U+000A
+                   qi::lit(L"\x72") [ qi::_val += L'\r' ] | // r    carriage return U+000D
+                   qi::lit(L"\x74") [ qi::_val += L'\t' ] | // t    tab             U+0009
+                   qi::lit(L"\x75")                         // uXXXX                U+XXXX
+                        >> _4HEXDIG [ qi::_val += qi::_1 ]
+                );
 
         // entry point
         json = value;
@@ -185,7 +182,7 @@ template <typename It, typename Skipper = qi::space_type>
     //
     qi::rule<It, Number()>  number;
     qi::rule<It, String()>  string;
-    qi::rule<It, std::string()> char_;
+    qi::rule<It, std::wstring()> char_;
 };
 
 template <typename It>
@@ -198,16 +195,19 @@ bool tryParseJson(It& f, It l) // note: first iterator gets updated
 template <typename It>
 bool tryParseJson(It& f, It l, JSON::Value& value) // note: first iterator gets updated
 {
-    static const parser<It, qi::space_type> p;
+    static const parser<It, encoding::space_type> p;
 
     try
     {
-        return qi::phrase_parse(f,l,p,qi::space,value);
+        return qi::phrase_parse(f,l,p,encoding::space,value);
     } catch(const qi::expectation_failure<It>& e)
     {
-        // expectation points not currently used, but we could tidy up the grammar to bail on unexpected tokens
-        std::string frag(e.first, e.last);
-        std::cerr << e.what() << "'" << frag << "'\n";
+        boost::utf8_output_iterator<std::ostream_iterator<char>> to_utf8(std::cerr);
+        // expectation points not currently used, but we could tidy up the
+        // grammar to bail on unexpected tokens (future)
+        std::cerr << e.what() << L"'";
+        std::copy(e.first, e.last, to_utf8); 
+        std::cerr << "'\n";
         return false;
     }
 }
@@ -215,16 +215,18 @@ bool tryParseJson(It& f, It l, JSON::Value& value) // note: first iterator gets 
 } // namespace JSON
 
 namespace { // TEST utils
-    std::string to_string(JSON::Value const& json) {
-        return boost::lexical_cast<std::string>(json);
+    std::wstring to_string(JSON::Value const& json) {
+        return boost::lexical_cast<std::wstring>(json);
     }
 
-    JSON::Value parse(std::string const& input) {
+    JSON::Value parse(std::wstring const& input) {
         auto f(begin(input)), l(end(input));
 
         JSON::Value parsed;
         if (!JSON::tryParseJson(f, l, parsed))
-            throw "whoops";
+        {
+            std::cerr << "whoops at position #" << std::distance(begin(input), f) << "\n";
+        }
 
         return parsed;
     }
@@ -239,28 +241,26 @@ int main()
     // read full stdin
     std::ifstream ifs("testcases/test1.json");
     ifs.unsetf(std::ios::skipws);
-    std::istream_iterator<char> it(ifs), pte;
-    const std::string input(it, pte);
+    std::istream_iterator<char, char> it(ifs), pte;
+    const std::string raw(it, pte);
 
-    auto value = parse(input);
+    // wrapping std::istream_iterator<char> doesn't work (probably requires
+    // forward/bidi iterators)
+    typedef boost::u8_to_u32_iterator<std::string::const_iterator> Conv2Utf32;
+    const std::wstring input(Conv2Utf32(begin(raw)), Conv2Utf32(end(raw)));
 
-    std::cout << "Dump of value:\n======================================\n" << value << "\n";
+    // actual test
+    auto 
+        value   = parse(input),
+        verify1 = roundtrip(value),
+        verify2 = roundtrip(verify1);
 
-    const auto verify = roundtrip(value);
-    if (to_string(value) == to_string(verify))
-        std::cout << "Roundtrip success!\n";
-    else
-    {
-        std::cout << "Roundtrip FAILED:\n";
-        std::cout << "Dump of verify:\n======================================\n" << verify << "\n";
-    }
+    std::cout << "value <=> verify #1 match:\t" << std::boolalpha << (to_string(value) == to_string(verify1)) << "\n";
+    std::cout << "value <=> verify #2 match:\t" << std::boolalpha << (to_string(value) == to_string(verify2)) << "\n";
 
-    const auto verify2 = roundtrip(verify);
-    if (to_string(value) == to_string(verify2))
-        std::cout << "Roundtrip #2 success!\n";
-    else
-    {
-        std::cout << "Roundtrip FAILED:\n";
-        std::cout << "Dump of verify2:\n======================================\n" << verify2 << "\n";
-    }
+    // output helpers
+    boost::utf8_output_iterator<std::ostream_iterator<char>> to_utf8(std::cout);
+    auto dump = [&to_utf8](JSON::Value const& v)  { auto s = to_string(v); std::copy(std::begin(s), std::end(s), to_utf8); };
+
+    dump(verify2);
 }

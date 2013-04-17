@@ -16,7 +16,7 @@ namespace JSON
     struct Array;
 
     struct String { 
-        std::string value; 
+        std::wstring value; 
         bool operator==(String const& s) const { return value == s.value; }
     };
 }
@@ -26,7 +26,7 @@ namespace std
     template <> struct hash<JSON::String>
     {
         size_t operator()(JSON::String const& s) const {
-            static std::hash<std::string> _hash;
+            static std::hash<std::wstring> _hash;
             return _hash(s.value);
         }
     };
