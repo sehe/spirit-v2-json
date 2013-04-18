@@ -51,6 +51,9 @@ namespace JSON
     {
         typedef std::unordered_map<String, Value> values_t;
         values_t values;
+
+        Object() = default;
+        explicit Object(std::initializer_list<values_t::value_type> init) : values(init) { }
     };
 
     struct Array
@@ -58,4 +61,7 @@ namespace JSON
         typedef std::deque<Value> values_t;
         values_t values;
     };
+
+    Value parse(std::wstring const&);
+    std::wstring to_string(Value const&);
 }
