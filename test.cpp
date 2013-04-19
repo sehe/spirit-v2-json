@@ -1,8 +1,19 @@
 #include <fstream>
 #include "JSON.hpp"
 #include <boost/algorithm/string/regex.hpp>
-#include <boost/range/adaptors.hpp>
-#include <boost/phoenix.hpp>
+#include <unordered_set>
+
+static std::unordered_set<std::wstring> readRareWordList()
+{
+    std::unordered_set<std::wstring> result;
+
+    std::wifstream ifs("testcases/rarewords.txt");
+    std::wstring line;
+    while (std::getline(ifs, line))
+        result.insert(std::move(line));
+
+    return result;
+}
 
 struct RareWords : boost::static_visitor<> {
 
@@ -20,8 +31,10 @@ struct RareWords : boost::static_visitor<> {
     }
 
     void operator()(JSON::Array& arr) const {
+        int i = 0;
         for(auto& v : arr.values) {
-            boost::apply_visitor(*this, v);
+            if (i++) // skip the first element in all arrays
+                boost::apply_visitor(*this, v);
         }
     }
 
@@ -29,21 +42,12 @@ struct RareWords : boost::static_visitor<> {
     // do replacements on strings
     void operator()(JSON::String& s) const {
         using namespace boost;
-        using namespace adaptors;
-        using namespace phoenix::arg_names;
 
-        const static std::vector<std::wstring> rareWords { 
-            L"late" , 
-            L"populate" , 
-            L"convicts" ,
-        };
-        const static auto&& regexen = rareWords 
-            | transformed(phoenix::construct<wregex>(L"^" + arg1 + L"$"));
+        const static auto rareWords = readRareWordList();
+        const static auto replacement = std::wstring(L"__RARE__");
 
-        const static std::wstring replacement = L"__RARE__";
-
-        for (auto&& word : regexen)
-            replace_all_regex(s.value, word, replacement);
+        if (rareWords.find(s.value) != rareWords.end())
+            s.value = replacement;
     }
 };
 
