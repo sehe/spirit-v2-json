@@ -1,5 +1,5 @@
 #define BOOST_SPIRIT_UNICODE
-#define PRETTY_PRINT // well, sort of; multiline for starters
+// #define PRETTY_PRINT // well, sort of; multiline for starters
 #include <boost/fusion/adapted/struct.hpp>
 #include <boost/fusion/adapted/std_pair.hpp>
 #include <boost/spirit/include/qi.hpp>
@@ -226,6 +226,40 @@ JSON::Value parse(std::wstring const& input) {
     }
 
     return parsed;
+}
+
+Value readFrom(std::istream& is)
+{
+    is.unsetf(std::ios::skipws);
+    boost::spirit::istream_iterator it(is), pte;
+
+    typedef boost::u8_to_u32_iterator<decltype(it)> Conv2Utf32;
+    Conv2Utf32 f(it), l(pte);
+
+    JSON::Value parsed;
+    if (!JSON::tryParseJson(f, l, parsed))
+    {
+        std::cerr << "whoops"; // TODO
+    }
+
+    return parsed;
+}
+
+Value readFrom(std::istream&& is)
+{
+    return readFrom(is);
+}
+
+Value readFrom(std::wistream& is)
+{
+    is.unsetf(std::ios::skipws);
+    std::istreambuf_iterator<wchar_t> a(is.rdbuf()), b;
+    return parse({ a, b }); // no streaming - no spirit::wistream_iterator AFAIK
+}
+
+Value readFrom(std::wistream&& is)
+{ 
+    return readFrom(is); 
 }
 
 } // namespace JSON

@@ -62,6 +62,14 @@ namespace JSON
         values_t values;
     };
 
+    // standard char streams are assumed to be utf8
+    Value readFrom(std::istream&);
+    Value readFrom(std::istream&&);
+
+    // standard wides streams are assumed to be utf32
     Value parse(std::wstring const&);
+    Value readFrom(std::wistream&);
+    Value readFrom(std::wistream&&);
+
     std::wstring to_string(Value const&);
 }

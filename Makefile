@@ -7,8 +7,8 @@ CPPFLAGS+=-isystem ~/custom/boost/
 # CPPFLAGS+=-fopenmp
 # CPPFLAGS+=-march=native
 
-# LDFLAGS+=-L ~/custom/boost/stage/lib/
-# LDFLAGS+=-lboost_system -lboost_regex -lboost_thread -lpthread
+LDFLAGS+=-L ~/custom/boost/stage/lib/
+LDFLAGS+=-lboost_system -lboost_regex -lboost_thread -lpthread
 
 CXX=clang++
 CC=clang
