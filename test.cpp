@@ -1,5 +1,4 @@
 #include <fstream>
-#include <boost/regex/pending/unicode_iterator.hpp> // unicode, please
 #include "JSON.hpp"
 #include <boost/algorithm/string/regex.hpp>
 #include <boost/range/adaptors.hpp>
@@ -48,18 +47,11 @@ struct RareWords : boost::static_visitor<> {
     }
 };
 
-void dump(JSON::Value const& v)
-{
-    boost::utf8_output_iterator<std::ostream_iterator<char>> to_utf8(std::cout);
-    auto s = to_string(v); 
-    std::copy(std::begin(s), std::end(s), to_utf8);
-}
-
 int main()
 {
     auto document = JSON::readFrom(std::ifstream("testcases/test3.json"));
 
     boost::apply_visitor(RareWords(), document);
 
-    dump(document);
+    std::cout << document;
 }

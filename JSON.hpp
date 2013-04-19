@@ -71,5 +71,9 @@ namespace JSON
     Value readFrom(std::wistream&);
     Value readFrom(std::wistream&&);
 
-    std::wstring to_string(Value const&);
+    std::wstring to_wstring(Value const&);
+    std::string  to_string(Value const&);
+
+    std::ostream&  operator<<(std::ostream&, Value const&);
+    std::wostream& operator<<(std::wostream&, Value const&);
 }

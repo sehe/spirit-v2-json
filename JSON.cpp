@@ -212,8 +212,14 @@ bool tryParseJson(It& f, It l, JSON::Value& value) // note: first iterator gets 
     }
 }
 
-std::wstring to_string(JSON::Value const& json) {
+std::wstring to_wstring(JSON::Value const& json) {
     return boost::lexical_cast<std::wstring>(json);
+}
+
+std::string to_string(JSON::Value const& json) {
+    std::ostringstream oss;
+    oss << json;
+    return oss.str();
 }
 
 JSON::Value parse(std::wstring const& input) {
@@ -262,6 +268,17 @@ Value readFrom(std::wistream&& is)
     return readFrom(is); 
 }
 
+std::ostream& operator<<(std::ostream& os, Value const& v)
+{
+    std::wostringstream oss;
+    oss << v;
+    auto wide = oss.str();
+
+    std::copy(begin(wide), end(wide), boost::utf8_output_iterator<std::ostream_iterator<char>>(os)); 
+    return os;
+}
+//std::wostream& operator<<(std::wostream&, Value const&);
+
 } // namespace JSON
 
 void initializer_test()
@@ -281,7 +298,7 @@ void initializer_test()
                 { String {L"bool"}, False() },
         } );
 
-        std::wcout << to_string(document);
+        std::cout << to_string(document);
     }
 
     //typedef boost::u8_to_u32_iterator<std::string::const_iterator> Conv2Utf32;
