@@ -11,17 +11,24 @@ void initializer_test()
     {
         using namespace JSON;
 
-        Object document( {
-                { String { L"number" }, Number { 314e-2 } },
-                { String { L"string" }, String { L"hello\ngoodbye" } },
-                { String { L"array" }, Array { { 
-                        String { L"text" }, 
-                        Number { 42 },
-                        Object { { String { L"dummy" }, Null() } } 
-                    } } 
+        Number radius(42);
+        Value v = radius;
+        v = L"Hello";
+        v = radius * radius * 3.14;
+
+        auto const document = Object {
+                { L"number", 314e-2 },
+                { L"string", L"hello\ngoodbye" },
+                { L"array" , Array { 
+                        L"text", 
+                        42,
+                        Object { { L"dummy", Null() } } 
+                    }
                 },
-                { String { L"bool" }, False() },
-        } );
+                { L"bool" , False() },
+                { L"radius", radius },
+                { String { 10, L'=' }, String { 10, L'*' } }
+        };
 
         std::cout << document[L"bool"]   << std::endl;
         std::cout << document[L"number"] << std::endl;

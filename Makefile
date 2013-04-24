@@ -16,7 +16,7 @@ CC=clang
 CXX=/usr/lib/gcc-snapshot/bin/g++
 CC=/usr/lib/gcc-snapshot/bin/gcc
 
-test.o: | JSON.hpp
+test.o JSON.o: JSON.hpp
 
 %.o: %.cpp
 	$(CXX) $(CPPFLAGS) $< -c -o $@

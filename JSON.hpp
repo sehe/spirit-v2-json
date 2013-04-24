@@ -17,6 +17,14 @@ namespace JSON
 
     struct String { 
         std::wstring value; 
+        String(const wchar_t* v) : value(v) { }
+        String(std::wstring const& v = {}) : value(v) { }
+
+        template <typename A1, typename A2, typename... Args>
+            /*explicit*/ String(A1&& a1, A2&& a2, Args&&... args) 
+                : value(std::forward<A1>(a1), std::forward<A2>(a2), std::forward<Args>(args)...) 
+            { }
+
         bool operator==(String const& s) const { return value == s.value; }
     };
 }
@@ -34,7 +42,13 @@ namespace std
 
 namespace JSON
 {
-    struct Number { double value;      };
+    struct Number { 
+        double value;
+        Number() = default;
+        Number(double value) : value(value) {}
+
+        operator double() const { return value; }
+    };
 
     typedef boost::variant<
             Undefined, // not legal as a JSON result
@@ -55,17 +69,17 @@ namespace JSON
         Object() = default;
         explicit Object(std::initializer_list<values_t::value_type> init) : values(init) { }
 
-        template <typename T> Value&       operator[](T&& key)       
-            { return values[{std::forward<T>(key)}]; }
-
-        template <typename T> Value const& operator[](T&& key) const 
-            { return values[{std::forward<T>(key)}]; }
+        Value&       operator[](String const& key)       { return values[key]; }
+        Value const& operator[](String const& key) const { return values.at(key); }
     };
 
     struct Array
     {
         typedef std::deque<Value> values_t;
         values_t values;
+
+        Array() = default;
+        explicit Array(std::initializer_list<Value> values) : values(values) {}
 
         template <typename T> Value&       operator[](T&& key)       
             { return values[std::forward<T>(key)]; }
