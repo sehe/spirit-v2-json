@@ -1,11 +1,16 @@
 #include <boost/variant.hpp>
 #include <boost/variant/recursive_wrapper.hpp>
 #include <unordered_map> // replace with <map> or <tr1/unordered_map> if desired
+#include <map>
 #include <deque>
 
 namespace JSON
 {
-    template <typename Tag> struct Literal { };
+    template <typename Tag> struct Literal 
+    { 
+        bool operator==(Literal const&) const { return true;  } 
+        bool operator< (Literal const&) const { return false; } 
+    };
 
     typedef Literal<struct tag_undefined> Undefined;
     typedef Literal<struct tag_false> False;
@@ -25,7 +30,8 @@ namespace JSON
                 : value(std::forward<A1>(a1), std::forward<A2>(a2), std::forward<Args>(args)...) 
             { }
 
-        bool operator==(String const& s) const { return value == s.value; }
+        bool operator==(String const& o) const { return value == o.value; } // unordered_map
+        bool operator< (String const& o) const { return value < o.value;  } // map
     };
 }
 
@@ -48,6 +54,7 @@ namespace JSON
         Number(double value) : value(value) {}
 
         operator double() const { return value; }
+        bool operator==(Number const& o) const { return value == o.value; }
     };
 
     typedef boost::variant<
@@ -63,7 +70,7 @@ namespace JSON
 
     struct Object
     {
-        typedef std::unordered_map<String, Value> values_t;
+        typedef std::/*unordered_*/map<String, Value> values_t;
         values_t values;
 
         Object() = default;
@@ -71,6 +78,8 @@ namespace JSON
 
         Value&       operator[](String const& key)       { return values[key]; }
         Value const& operator[](String const& key) const { return values.at(key); }
+
+        bool operator==(Object const& o) const { return values == o.values; }
     };
 
     struct Array
@@ -79,13 +88,15 @@ namespace JSON
         values_t values;
 
         Array() = default;
-        explicit Array(std::initializer_list<Value> values) : values(values) {}
+        /*explicit*/ Array(std::initializer_list<Value> values) : values(values) {}
 
         template <typename T> Value&       operator[](T&& key)       
             { return values[std::forward<T>(key)]; }
 
         template <typename T> Value const& operator[](T&& key) const 
             { return values[std::forward<T>(key)]; }
+
+        bool operator==(Array const& o) const { return values == o.values; }
     };
 
     static inline Array&              as_array  (Value& v)       { return boost::get<Array>(v);        } 
