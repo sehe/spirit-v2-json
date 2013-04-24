@@ -281,26 +281,3 @@ std::ostream& operator<<(std::ostream& os, Value const& v)
 
 } // namespace JSON
 
-void initializer_test()
-{
-    {
-        using namespace JSON;
-
-        const Object document( {
-                { String { L"number" }, Number { 314e-2 } },
-                { String {L"string"}, String {L"hello\ngoodbye"} },
-                { String {L"array"}, Array { { 
-                        String {L"text"}, 
-                        Number {42},
-                        Object { { String {L"dummy"}, Null() } } 
-                    } } 
-                },
-                { String {L"bool"}, False() },
-        } );
-
-        std::cout << to_string(document);
-    }
-
-    //typedef boost::u8_to_u32_iterator<std::string::const_iterator> Conv2Utf32;
-    //const std::wstring input(Conv2Utf32(begin(raw)), Conv2Utf32(end(raw)));
-}
