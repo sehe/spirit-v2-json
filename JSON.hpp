@@ -1,6 +1,5 @@
 #include <boost/variant.hpp>
 #include <boost/variant/recursive_wrapper.hpp>
-#include <unordered_map> // replace with <map> or <tr1/unordered_map> if desired
 #include <map>
 #include <deque>
 
