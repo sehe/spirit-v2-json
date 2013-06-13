@@ -111,14 +111,10 @@ namespace JSON
     Value readFrom(std::istream&);
     Value readFrom(std::istream&&);
 
-    // standard wides streams are assumed to be utf32
     Value parse(std::wstring const&);
-    Value readFrom(std::wistream&);
-    Value readFrom(std::wistream&&);
-
+    Value parse(std:: string const&);
     std::wstring to_wstring(Value const&);
-    std::string  to_string(Value const&);
+    std::string  to_string (Value const&);
 
-    std::ostream&  operator<<(std::ostream&, Value const&);
-    std::wostream& operator<<(std::wostream&, Value const&);
+    std::ostream&  operator<<(std::ostream&,  Value const&);
 }
