@@ -13,7 +13,6 @@
 // unicode, please
 #include <boost/regex/pending/unicode_iterator.hpp>
 
-BOOST_FUSION_ADAPT_STRUCT(JSON::String, (std::wstring, value))
 BOOST_FUSION_ADAPT_STRUCT(JSON::Object, (JSON::Object::values_t, values))
 BOOST_FUSION_ADAPT_STRUCT(JSON::Array,  (JSON::Array ::values_t, values))
 
@@ -120,13 +119,13 @@ namespace JSON {
         }
 
       private:
-        qi::rule<It, std::pair<String, Value>(),  Skipper> member;
+        qi::rule<It, std::pair<std::wstring, Value>(),  Skipper> member;
         qi::rule<It, Value(),  Skipper> json, value;
         qi::rule<It, Object(), Skipper> object;
         qi::rule<It, Array(),  Skipper> array;
         //
         qi::rule<It, Value()>    number;
-        qi::rule<It, String()>   string;
+        qi::rule<It, std::wstring()> string;
         qi::rule<It, std::wstring()> char_;
     };
 
@@ -196,12 +195,12 @@ namespace JSON {
         }
 
       private:
-        karma::rule<It, std::pair<String, Value>(),  Delimiter> member;
+        karma::rule<It, std::pair<std::wstring, Value>(),  Delimiter> member;
         karma::rule<It, Value(),  Delimiter>  json, value;
         karma::rule<It, Object(), Delimiter>  object;
         karma::rule<It, Array(),  Delimiter>  array;
         //
-        karma::rule<It, String()>             string;
+        karma::rule<It, std::wstring()>       string;
         karma::rule<It, wchar_t()>            char_;
         karma::rule<It, uint32_t()>           unicode_escape;
         karma::symbols<wchar_t, std::wstring> char_escape;
