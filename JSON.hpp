@@ -47,15 +47,6 @@ namespace std
 
 namespace JSON
 {
-    struct Number { 
-        double value;
-        Number() = default;
-        Number(double value) : value(value) {}
-
-        operator double() const { return value; }
-        bool operator==(Number const& o) const { return value == o.value; }
-    };
-
     typedef boost::variant<
             Undefined, // not legal as a JSON result
             False, 
@@ -64,7 +55,8 @@ namespace JSON
             boost::recursive_wrapper<Object>, 
             boost::recursive_wrapper<Array>,
             String,
-            Number
+            int64_t,
+            long double
         > Value;
 
     struct Object
@@ -101,11 +93,13 @@ namespace JSON
     static inline Array&              as_array  (Value& v)       { return boost::get<Array>(v);        } 
     static inline Object&             as_object (Value& v)       { return boost::get<Object>(v);       } 
     static inline std::wstring&       as_wstring(Value& v)       { return boost::get<String>(v).value; } 
-    static inline double&             as_double (Value& v)       { return boost::get<Number>(v).value; } 
+    static inline long double&        as_double (Value& v)       { return boost::get<long double>(v);  } 
+    static inline int64_t&            as_int64  (Value& v)       { return boost::get<int64_t>(v);      } 
     static inline Array const&        as_array  (Value const& v) { return boost::get<Array>(v);        } 
     static inline Object const&       as_object (Value const& v) { return boost::get<Object>(v);       } 
     static inline std::wstring const& as_wstring(Value const& v) { return boost::get<String>(v).value; } 
-    static inline double const&       as_double (Value const& v) { return boost::get<Number>(v).value; } 
+    static inline long double const&  as_double (Value const& v) { return boost::get<long double>(v);  } 
+    static inline int64_t const&      as_int64  (Value const& v) { return boost::get<int64_t>(v);      } 
 
     // standard char streams are assumed to be utf8
     Value readFrom(std::istream&);

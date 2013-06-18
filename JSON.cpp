@@ -1,7 +1,6 @@
 //#define BOOST_SPIRIT_DEBUG
 #define BOOST_SPIRIT_USE_PHOENIX_V3
 #define BOOST_SPIRIT_UNICODE
-// #define PRETTY_PRINT // well, sort of; multiline for starters
 #include "JSON.hpp"
 #include <boost/fusion/adapted/std_pair.hpp>
 #include <boost/fusion/adapted/struct.hpp>
@@ -15,7 +14,6 @@
 #include <boost/regex/pending/unicode_iterator.hpp>
 
 BOOST_FUSION_ADAPT_STRUCT(JSON::String, (std::wstring, value))
-BOOST_FUSION_ADAPT_STRUCT(JSON::Number, (double, value))
 BOOST_FUSION_ADAPT_STRUCT(JSON::Object, (JSON::Object::values_t, values))
 BOOST_FUSION_ADAPT_STRUCT(JSON::Array,  (JSON::Array ::values_t, values))
 
@@ -73,7 +71,7 @@ namespace JSON {
             array = L'[' >> -(value % L',') >> L']';
 
             // 2.4.  Numbers
-            // Note out spirit grammar takes a shortcut, as the RFC specification is more restrictive:
+            // Note our spirit grammar takes a shortcut, as the RFC specification is more restrictive:
             //
             // However non of the above affect any structure characters (:,{}[] and double quotes) so it doesn't
             // matter for the current purpose. For full compliance, this remains TODO:
@@ -90,7 +88,9 @@ namespace JSON {
             //     minus = %x2D               ; -
             //     plus = %x2B                ; +
             //     zero = %x30                ; 0
-            number = qi::double_; // shortcut :)
+            const static qi::real_parser<long double> ldbl;
+            const static qi::int_parser <int64_t>     lint;
+            number = qi::lexeme [ lint >> !qi::char_(".e0-9") ] | ldbl;
 
             // 2.5 Strings
             string = qi::lexeme [ L'"' >> *char_ >> L'"' ];
@@ -125,8 +125,8 @@ namespace JSON {
         qi::rule<It, Object(), Skipper> object;
         qi::rule<It, Array(),  Skipper> array;
         //
-        qi::rule<It, Number()>  number;
-        qi::rule<It, String()>  string;
+        qi::rule<It, Value()>    number;
+        qi::rule<It, String()>   string;
         qi::rule<It, std::wstring()> char_;
     };
 
@@ -150,12 +150,16 @@ namespace JSON {
     {
         generator() : generator::base_type(json)
         {
+            const static karma::int_generator <int64_t>     integer;
+            const static karma::real_generator<long double> long_double;
+
             value = karma::attr_cast<False> (karma::lit(L"false")) 
                   | karma::attr_cast<Null>  (karma::lit(L"null")) 
                   | karma::attr_cast<True>  (karma::lit(L"true"))
                   | object
                   | array
-                  | number
+                  | integer
+                  | long_double
                   | string
                   ;
 
@@ -163,8 +167,6 @@ namespace JSON {
             member = string << L':' << value;
 
             array = L'[' << -(value % L',') << L']';
-
-            number = karma::double_;
 
             char_escape.add
                 (L'"',  L"\\\"")
@@ -190,20 +192,18 @@ namespace JSON {
             // entry point
             json = value;
 
-            BOOST_SPIRIT_DEBUG_NODES( (json)(value)(object)(member)(array)(number)(string)(char_)(unicode_escape));
+            BOOST_SPIRIT_DEBUG_NODES( (json)(value)(object)(member)(array)(string)(char_)(unicode_escape));
         }
 
       private:
         karma::rule<It, std::pair<String, Value>(),  Delimiter> member;
-        karma::rule<It, Value(),  Delimiter> json, value;
-        karma::rule<It, Object(), Delimiter> object;
-        karma::rule<It, Array(),  Delimiter> array;
+        karma::rule<It, Value(),  Delimiter>  json, value;
+        karma::rule<It, Object(), Delimiter>  object;
+        karma::rule<It, Array(),  Delimiter>  array;
         //
-        karma::rule<It, Number()>   number;
-        //
-        karma::rule<It, String()>   string;
-        karma::rule<It, wchar_t()>  char_;
-        karma::rule<It, uint32_t()> unicode_escape;
+        karma::rule<It, String()>             string;
+        karma::rule<It, wchar_t()>            char_;
+        karma::rule<It, uint32_t()>           unicode_escape;
         karma::symbols<wchar_t, std::wstring> char_escape;
     };
 

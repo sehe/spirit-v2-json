@@ -32,7 +32,7 @@ void roundtrip_test()
     std::cout << "attribute_b: " <<           as_object(as_object(document)[L"Event"])[L"attribute_b"]  << std::endl;
     std::cout << "attribute_c: " << as_double(as_object(as_object(document)[L"Event"])[L"attribute_c"]) << std::endl;
     std::cout << "attribute_c: " <<           as_object(as_object(document)[L"Event"])[L"attribute_c"]  << std::endl;
-    std::cout << "attribute_d: " << as_double(as_object(as_object(document)[L"Event"])[L"attribute_d"]) << std::endl;
+    std::cout << "attribute_d: " << as_int64 (as_object(as_object(document)[L"Event"])[L"attribute_d"]) << std::endl;
     std::cout << "attribute_d: " <<           as_object(as_object(document)[L"Event"])[L"attribute_d"]  << std::endl;
 
     std::cout << "document <=> verify1 equal:     \t" << std::boolalpha << (document == verify1)                       << "\n";
@@ -48,19 +48,19 @@ void initializer_test()
 
     const Array arr { 
         L"text", 
-        42,
+        42l,
         Object { { L"dummy", Null() } } 
     };
 
-    auto radius = as_double(arr[1]);
+    auto radius = as_int64(arr[1]);
 
     auto const document = Object {
-            { L"number", 314e-2 },
+            { L"number", 314e-2l },
             { L"string", L"hello\ngoodbye" },
             { L"array" , arr },
             { L"bool" , False() },
             { L"radius", radius },
-            { L"area", radius * radius * 3.14 },
+            { L"area", radius * radius * 3.14l },
             { String { 10, L'=' }, String { 10, L'*' } }
     };
 
@@ -83,9 +83,9 @@ void karma_tdd()
                 False(),
                 String(L"string"),
                 L"s\fecial\tcha\rs \before \nothing \\else gets done \"quote\"",
-                43,
-                3.14,
-                Array { Null(), True(), False(), String(L"array"), 43, 3.14 },
+                43l,
+                3.14l,
+                Array { Null(), True(), False(), String(L"array"), 43l, 3.14l },
             })
     {
         std:: cout << "---"         << std::endl;
