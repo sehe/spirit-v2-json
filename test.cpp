@@ -1,4 +1,6 @@
 #include <sstream>
+#include <fstream>
+#include <vector>
 #include "JSON.hpp"
 
 int main()
@@ -20,8 +22,8 @@ int main()
     JSON::Value expected = JSON::Object {
         { L"RootA", L"Value in parent node" },
         { L"ChildNode", JSON::Object {
-                 { L"ChildA", JSON::Array { 1,2 } },
-                 { L"ChildB", 42 },
+                 { L"ChildA", JSON::Array { 1l,2l } },
+                 { L"ChildB", 42l },
              } },
     };
     std::cout << "Check equality: " << std::boolalpha << (document == expected) << std::endl;
