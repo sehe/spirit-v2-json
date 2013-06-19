@@ -52,10 +52,13 @@ namespace JSON {
     {
         parser() : parser::base_type(json)
         {
+            truefalse.add
+                (L"true", true)
+                (L"false", false);
+
             // 2.1 values
-            value = qi::attr_cast<False> (qi::lit(L"false")) 
-                  | qi::attr_cast<Null>  (qi::lit(L"null")) 
-                  | qi::attr_cast<True>  (qi::lit(L"true"))
+            value = qi::attr_cast<Null>  (qi::lit(L"null")) 
+                  | truefalse
                   | object
                   | array
                   | number
@@ -119,6 +122,7 @@ namespace JSON {
         }
 
       private:
+        qi::symbols<wchar_t, bool> truefalse;
         qi::rule<It, std::pair<std::wstring, Value>(),  Skipper> member;
         qi::rule<It, Value(),  Skipper> json, value;
         qi::rule<It, Object(), Skipper> object;
@@ -152,9 +156,12 @@ namespace JSON {
             const static karma::int_generator <int64_t>     integer;
             const static karma::real_generator<long double> long_double;
 
-            value = karma::attr_cast<False> (karma::lit(L"false")) 
-                  | karma::attr_cast<Null>  (karma::lit(L"null")) 
-                  | karma::attr_cast<True>  (karma::lit(L"true"))
+            truefalse.add
+                (false, L"false")
+                (true,  L"true");
+
+            value = karma::attr_cast<Null>  (karma::lit(L"null")) 
+                  | truefalse
                   | object
                   | array
                   | integer
@@ -195,6 +202,7 @@ namespace JSON {
         }
 
       private:
+        karma::symbols<bool, std::wstring> truefalse;
         karma::rule<It, std::pair<std::wstring, Value>(),  Delimiter> member;
         karma::rule<It, Value(),  Delimiter>  json, value;
         karma::rule<It, Object(), Delimiter>  object;

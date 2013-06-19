@@ -12,18 +12,15 @@ namespace JSON
     };
 
     typedef Literal<struct tag_undefined> Undefined;
-    typedef Literal<struct tag_false> False;
     typedef Literal<struct tag_null>  Null;
-    typedef Literal<struct tag_true>  True;
 
     struct Object;
     struct Array;
 
     typedef boost::variant<
             Undefined, // not legal as a JSON result
-            False, 
             Null, 
-            True, 
+            bool, 
             boost::recursive_wrapper<Object>, 
             boost::recursive_wrapper<Array>,
             std::wstring,

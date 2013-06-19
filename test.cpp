@@ -28,7 +28,7 @@ void initializer_test()
             { L"number", 314e-2l },
             { L"string", L"hello\ngoodbye" },
             { L"array" , arr },
-            { L"bool" , False() },
+            { L"bool" , false },
             { L"radius", radius },
             { L"area", radius * radius * 3.14l },
             { std::wstring { 10, L'=' }, std::wstring { 10, L'*' } }
@@ -49,13 +49,13 @@ void karma_tdd()
     using namespace JSON;
     for (auto o : std::vector<Value> { 
                 Null(),
-                True(),
-                False(),
+                true,
+                false,
                 std::wstring(L"string"),
                 L"s\fecial\tcha\rs \before \nothing \\else gets done \"quote\"",
                 43l,
                 3.14l,
-                Array { Null(), True(), False(), std::wstring(L"array"), 43l, 3.14l },
+                Array { Null(), true, false, std::wstring(L"array"), 43l, 3.14l },
             })
     {
         std:: cout << "---"         << std::endl;
