@@ -1,95 +1,45 @@
-#include <sstream>
-#include <fstream>
-#include <vector>
 #include "JSON.hpp"
 
-// util
-static JSON::Value roundtrip(JSON::Value const& given) {
-    return JSON::parse(to_string(given));
-}
-
-void initializer_test()
-{
+namespace {
     using namespace JSON;
-
-    const Array arr { 
-        "text", 
-        42l,
-        Object { { "dummy", Null() } } 
-    };
-
-    auto radius = as_int64(arr[1]);
-
-    auto const document = Object {
-            { "number", 314e-2l },
-			{ "string", "hello\ngoodbye" },
-			{ "array" , arr },
-			{ "bool" , Bool(false) },
-            { "radius", radius },
-            { "area", radius * radius * 3.14l },
-            { std::string { 10, '=' }, std::string { 10, '*' } }
-    };
-
-    std::cout << document["bool"]   << std::endl;
-    std::cout << document["number"] << std::endl;
-    std::cout << document["string"] << std::endl;
-    std::cout << document["array"]  << std::endl;
-    std::cout << document["bool"]   << std::endl;
-    std::cout << document["radius"] << std::endl;
-    std::cout << document["area"]   << std::endl;
-    std::cout << document            << std::endl;
-}
-
-void karma_tdd()
-{
-    using namespace JSON;
-    for (auto o : std::vector<Value> { 
-                Null(),
-                Bool(true),
-                Bool(false),
-                std::string("string"),
-                "s\fecial\tcha\rs \before \nothing \\else gets done \"quote\"",
-                43l,
-                3.14l,
-                Array { Null(), Bool(true), Bool(false), std::string("array"), 43l, 3.14l },
-            })
+    struct make_love : boost::static_visitor<void>
     {
-        std::cout.clear();
-        std::cout << "---"         << std::endl;
-        std::cout << to_string(o)  << std::endl;
-    }
-}
+        bool top_level;
+        make_love(bool top_level = true) : top_level(top_level) {}
 
-void unicode_roundtrip()
-{
-    auto 
-        value   = JSON::readFrom(std::ifstream("testcases/test1.json")),
-        verify1 = roundtrip(value),
-        verify2 = roundtrip(verify1);
+        void operator()(Object& a, Object const& b) const
+        {
+            for(auto el: b.values)
+            {
+                if (a.values.end() != a.values.find(el.first))
+                {
+                    boost::apply_visitor(make_love(false), a[el.first], el.second);
+                } else
+                {
+                    a.values[el.first] = el.second;
+                }
+            }
+        }
 
-    std::cout << "value <=> verify #1 text match:\t" << std::boolalpha << (to_string(value) == to_string(verify1)) << "\n";
-    std::cout << "value <=> verify #2 text match:\t" << std::boolalpha << (to_string(verify1) == to_string(verify2)) << "\n";
+        template<typename T> void operator()(T& a, T const& b)  const
+            {
+                if (!top_level)
+                    a = b;
+            }
 
-    std::cout << "value <=> verify #1 equality match:\t" << std::boolalpha << (value == verify1) << "\n";
-    std::cout << "value <=> verify #2 equality match:\t" << std::boolalpha << (verify1 == verify2) << "\n";
-
-    std::cout << verify2 << "\n";
+        template<typename T, typename U> void operator()(T& a, U const& b)  const
+            {
+                std::cerr << "Warning: incompatible arguments (" << typeid(T).name() << ", " << typeid(U).name() << ")\n";
+            }
+    };
 }
 
 int main()
 {
-    std::cout << " =================================================\n";
-    std::cout << " === karma_tdd\n";
-    std::cout << " =================================================\n";
-    karma_tdd();
+    auto jsonA = JSON::parse("{ \"a\":\"1\", \"b\":\"2\", \"c\":{\"a\":\"1\", \"b\":\"2\"} }");
+    auto jsonB = JSON::parse("{ \"b\":\"2new\", \"c\":{\"a\":\"1new\"} }");
 
-    std::cout << " =================================================\n";
-    std::cout << " === unicode_roundtrip\n";
-    std::cout << " =================================================\n";
-    unicode_roundtrip();
+    boost::apply_visitor(make_love(), jsonA, jsonB);
 
-    std::cout << " =================================================\n";
-    std::cout << " === initializer_test\n";
-    std::cout << " =================================================\n";
-    initializer_test();
+    std::cout << jsonA;
 }
