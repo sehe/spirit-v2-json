@@ -1,7 +1,7 @@
 #include <sstream>
 #include <fstream>
 #include <vector>
-#include "JSON.hpp"
+#include "json.hpp"
 
 // util
 static JSON::Value roundtrip(JSON::Value const& given) {

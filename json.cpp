@@ -1,15 +1,19 @@
 #define BOOST_SPIRIT_DEBUG
 #define BOOST_SPIRIT_USE_PHOENIX_V3
 #define BOOST_SPIRIT_UNICODE
-#include "JSON.hpp"
+#if defined(_MSC_VER)
+#   pragma warning (disable:4503) // decorated name length exceeded
+#   pragma warning (disable:4996) // unchecked iterator
+#endif
+
+#include <iomanip>
+#include "json.hpp"
 #include <boost/fusion/adapted/std_pair.hpp>
 #include <boost/fusion/adapted/struct.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/spirit/include/karma.hpp>
 #include <boost/spirit/include/phoenix.hpp>
 #include <boost/spirit/include/phoenix_function.hpp>
 #include <boost/spirit/include/qi.hpp>
-#include <iomanip>
 // unicode, please
 #include <boost/regex/pending/unicode_iterator.hpp>
 
@@ -17,26 +21,27 @@ BOOST_FUSION_ADAPT_STRUCT(JSON::Object, (JSON::Object::values_t, values))
 BOOST_FUSION_ADAPT_STRUCT(JSON::Array,  (JSON::Array ::values_t, values))
 
 namespace JSON {
+    Value& Object::operator[](std::string const& key)
+    {
+        auto match = std::find_if(begin(values), end(values), [&key](Entry const& e) { return key == e.first; });
+        if (match != end(values))
+            return match->second;
 
-    namespace {
-        template <typename Ret, typename PolyFunc>
-        struct VisitorWrap : boost::static_visitor<Ret> {
-            VisitorWrap(PolyFunc&& f) : _f(std::forward<PolyFunc>(f)) {}
+        values.push_back({ key, Undefined{} });
+        return values.back().second;
+    }
 
-            template <typename T> Ret operator()(T const& v) const {
-                return _f(v);
-            }
-            template <typename T, typename U> Ret operator()(T const& v, U const& w) const {
-                return _f(v, w);
-            }
-        private:
-            PolyFunc _f;
-        };
+    Value const& Object::operator[](std::string const& key) const
+    {
+        auto match = std::find_if(begin(values), end(values), [&key](Entry const& e) { return key == e.first; });
+        // argumentAssert(match != end(values), key);
+        return match->second;
+    }
 
-        template <typename Ret = void, typename PolyFunc>
-        VisitorWrap<Ret, PolyFunc> make_visitor(PolyFunc&& f) {
-            return { std::forward<PolyFunc>(f) };
-        }
+    bool Object::has_key(std::string const& key) const
+    {
+        auto match = std::find_if(begin(values), end(values), [&key](Entry const& e) { return key == e.first; });
+        return match != end(values);
     }
 
     namespace { namespace detail {
@@ -63,8 +68,19 @@ namespace JSON {
     namespace qi       = boost::spirit::qi;
     namespace encoding = qi::standard;
 
-    template <typename It, typename Skipper = encoding::space_type>
-        struct parser : qi::grammar<It, Value(), Skipper>
+    template <typename It>
+        struct skipper final : qi::grammar<It>
+    {
+        skipper() : skipper::base_type(rule) {}
+
+        const qi::rule<It> rule = qi::space 
+                | ("//" >> *~qi::char_("\n")   >> -qi::eol)
+                | ("/*" >> *(qi::char_ - "*/") >> "*/")
+                ;
+    };
+
+    template <typename It, typename Skipper>
+        struct parser final : qi::grammar<It, Value(), Skipper>
     {
         parser() : parser::base_type(json)
         {
@@ -106,8 +122,8 @@ namespace JSON {
             //     minus = %x2D               ; -
             //     plus = %x2B                ; +
             //     zero = %x30                ; 0
-            const static qi::real_parser<long double> ldbl;
-            const static qi::int_parser <int64_t>     lint;
+            const static qi::real_parser<Double>  ldbl = {};
+            const static qi::int_parser <Integer> lint = {};
             number = qi::lexeme [ lint >> !qi::char_(".e0-9") ] | ldbl;
 
             // 2.5 Strings
@@ -159,8 +175,8 @@ namespace JSON {
     {
         generator() : generator::base_type(json)
         {
-            const static karma::int_generator <int64_t>     integer;
-            const static karma::real_generator<long double> long_double;
+            const static karma::int_generator <Integer> integer     = {};
+            const static karma::real_generator<Double>  long_double = {};
 
             truefalse.add
                 (Bool(false), "false")
@@ -171,7 +187,7 @@ namespace JSON {
                   | object
                   | array
                   | integer
-                  | long_double
+                  | long_double // TODO FIXME roundtrip safe formatting
                   | string
                   ;
 
@@ -194,11 +210,11 @@ namespace JSON {
             using karma::_1;
 
             unicode_escape = 
-                karma::eps(_val >= 0x0 && _val <= 0x1f) << 
+                karma::eps(_val >= uint32_t(0x0) && _val <= uint32_t(0x1f)) << 
                 encoding::string [ _1 = unicode_escape_(_val) ]
                 ;
 
-            char_ = char_escape /*| unicode_escape*/ | encoding::char_;
+            char_ = char_escape | unicode_escape | encoding::char_;
             string = '"' << *char_ << '"';
 
             // entry point
@@ -223,19 +239,22 @@ namespace JSON {
     template <typename It>
     bool tryParseJson(It& f, It l, Value& value) // note: first iterator gets updated
     {
-        static const parser<It, encoding::space_type> p;
+        static const skipper<It> s = {};
+        static const parser<It, skipper<It> > p;
 
         try
         {
-            return qi::phrase_parse(f,l,p,encoding::space,value);
+            return qi::phrase_parse(f,l,p,s,value);
         } catch(const qi::expectation_failure<It>& e)
         {
-            boost::utf8_output_iterator<std::ostream_iterator<char>> to_utf8(std::cerr);
+            std::string msg;
+
+            boost::utf8_output_iterator<std::back_insert_iterator<std::string>> to_utf8(std::back_inserter(msg));
             // expectation points not currently used, but we could tidy up the
             // grammar to bail on unexpected tokens (future)
-            std::cerr << e.what() << "'";
             std::copy(e.first, e.last, to_utf8); 
-            std::cerr << "'\n";
+
+            std::cerr << e.what() << "'" << msg << "'\n";
             return false;
         }
     }
@@ -256,8 +275,8 @@ namespace JSON {
 
         return text;
     }
+
 /*
- *
  *    std::string to_string(Value const& json) {
  *        std::string result;
  *        auto out = std::back_inserter(result);
@@ -314,4 +333,5 @@ namespace JSON {
     }
 
 } // namespace JSON
+
 
