@@ -29,6 +29,9 @@ int main()
         std::cout << "X.var1: " << data.var1 << "\n";
         std::cout << "X.var2: " << data.var2 << "\n";
     }
+
+    std::cout << "doc: " << doc << "\n";
+    std::cout << "doc[\"mykey\"]: " << doc["mykey"] << "\n";
 }
 
 X X::from_json(JSON::Value const& v)
