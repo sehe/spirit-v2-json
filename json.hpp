@@ -4,9 +4,6 @@
 #include <vector>
 #include <deque>
 
-#define CONSTEXPR_CTOR constexpr
-#define CONSTEXPR      constexpr
-
 namespace JSON
 {
     template <typename Tag> struct Literal 
@@ -21,12 +18,12 @@ namespace JSON
     struct Object;
     struct Array;
 
-    using Integer = int64_t;
-    using Double  = long double;
-    using String  = std::string;
+    typedef int64_t     Integer; 
+    typedef long double Double ; 
+    typedef std::string String ; 
 
     struct Bool { // circumvent (non-standard?) ambiguities initializing Value with MSVC12)
-        explicit CONSTEXPR_CTOR Bool(bool value = false) : _value(value) {}
+        explicit constexpr Bool(bool value = false) : _value(value) {}
         Bool(Bool const&) = default;
         explicit operator bool() const { return _value; }
 
@@ -35,7 +32,7 @@ namespace JSON
 
     private:
         bool _value;
-    } static CONSTEXPR True(true), False(false);
+    } static constexpr True(true), False(false);
 
     typedef boost::variant<
             Undefined, // not legal as a JSON result
@@ -50,8 +47,8 @@ namespace JSON
 
     struct Object
     {
-        using Entry = std::pair<String, Value>;
-        using values_t = std::vector<Entry>; // TODO use a stable_vector?
+        typedef std::pair<String, Value> Entry;
+        typedef std::vector<Entry> values_t; // TODO use a stable_vector?
 
         values_t values;
 

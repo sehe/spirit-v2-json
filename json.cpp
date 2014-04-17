@@ -34,7 +34,7 @@ namespace JSON {
     Value const& Object::operator[](std::string const& key) const
     {
         auto match = std::find_if(begin(values), end(values), [&key](Entry const& e) { return key == e.first; });
-        // argumentAssert(match != end(values), key);
+        //argumentAssert(match != end(values), key);
         return match->second;
     }
 
@@ -66,16 +66,16 @@ namespace JSON {
     ///////////////////////////////////////////////////////////////
 
     namespace qi       = boost::spirit::qi;
-    namespace encoding = qi::standard;
+    namespace encoding = qi::unicode;
 
     template <typename It>
         struct skipper final : qi::grammar<It>
     {
         skipper() : skipper::base_type(rule) {}
 
-        const qi::rule<It> rule = qi::space 
-                | ("//" >> *~qi::char_("\n")   >> -qi::eol)
-                | ("/*" >> *(qi::char_ - "*/") >> "*/")
+        const qi::rule<It> rule = encoding::space 
+                | ("//" >> *~encoding::char_("\n")   >> -qi::eol)
+                | ("/*" >> *(encoding::char_ - "*/") >> "*/")
                 ;
     };
 
@@ -124,7 +124,7 @@ namespace JSON {
             //     zero = %x30                ; 0
             const static qi::real_parser<Double>  ldbl = {};
             const static qi::int_parser <Integer> lint = {};
-            number = qi::lexeme [ lint >> !qi::char_(".e0-9") ] | ldbl;
+            number = qi::lexeme [ lint >> !encoding::char_(".e0-9") ] | ldbl;
 
             // 2.5 Strings
             string = qi::lexeme [ '"' >> *char_ >> '"' ];
@@ -176,7 +176,7 @@ namespace JSON {
         generator() : generator::base_type(json)
         {
             const static karma::int_generator <Integer> integer     = {};
-            const static karma::real_generator<Double>  long_double = {};
+            const static karma::real_generator<Double>  real        = {};
 
             truefalse.add
                 (Bool(false), "false")
@@ -187,7 +187,7 @@ namespace JSON {
                   | object
                   | array
                   | integer
-                  | long_double // TODO FIXME roundtrip safe formatting
+                  | real        // TODO FIXME roundtrip safe formatting
                   | string
                   ;
 
@@ -211,7 +211,7 @@ namespace JSON {
 
             unicode_escape = 
                 karma::eps(_val >= uint32_t(0x0) && _val <= uint32_t(0x1f)) << 
-                encoding::string [ _1 = unicode_escape_(_val) ]
+                qi::string [ _1 = unicode_escape_(_val) ]
                 ;
 
             char_ = char_escape | unicode_escape | encoding::char_;
